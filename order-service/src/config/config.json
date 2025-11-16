@@ -1,0 +1,20 @@
+{
+    "development": {
+        "database": "restaurantdb",
+        "username": "postgres",
+        "password": "postgres",
+        "host": "postgres_db",
+        "port": 5432,
+        "dialect": "postgres",
+        "logging": false
+    },
+    "production": {
+        "database": "restaurantdb",
+        "username": "postgres",
+        "password": "postgres",
+        "host": "postgres_db",
+        "port": 5432,
+        "dialect": "postgres",
+        "logging": false
+    }
+}

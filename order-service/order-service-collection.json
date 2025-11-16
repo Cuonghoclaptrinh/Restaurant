@@ -1,0 +1,543 @@
+{
+    "info": {
+        "name": "Order Service Full API",
+        "_postman_id": "order-service-full-api-collection",
+        "description": "Collection for testing all Order Service APIs",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Get Menu Items",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/menu-items?query=Phở&type=food&category=breakfast&maxPrice=10",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "menu-items"
+                    ],
+                    "query": [
+                        {
+                            "key": "query",
+                            "value": "Phở"
+                        },
+                        {
+                            "key": "type",
+                            "value": "food"
+                        },
+                        {
+                            "key": "category",
+                            "value": "breakfast"
+                        },
+                        {
+                            "key": "maxPrice",
+                            "value": "10"
+                        }
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Get Menu Item by ID",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/menu-items/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "menu-items",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Create Menu Item",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"name\": \"Bún riêu\", \"price\": 8, \"category\": \"lunch\", \"type\": \"food\", \"description\": \"Bún riêu cua chua thanh, thơm ngon\"}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/menu-items",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "menu-items"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Update Menu Item",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"name\": \"Phở bò đặc biệt\", \"price\": 12, \"category\": \"breakfast\", \"type\": \"food\", \"description\": \"Phở bò tái nạm gầu, nước dùng đậm đà\"}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/menu-items/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "menu-items",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Delete Menu Item",
+            "request": {
+                "method": "DELETE",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/menu-items/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "menu-items",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Get Orders",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/orders?status=pending",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "orders"
+                    ],
+                    "query": [
+                        {
+                            "key": "status",
+                            "value": "pending"
+                        }
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Get Order by ID",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/orders/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "orders",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Create Order",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"tableId\": 2, \"total\": 20, \"status\": \"pending\", \"orderItems\": [{\"menuItemId\": 2, \"quantity\": 2, \"price\": 9}, {\"menuItemId\": 6, \"quantity\": 1, \"price\": 2}]}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/orders",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "orders"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Update Order",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"tableId\": 1, \"total\": 25, \"status\": \"confirmed\"}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/orders/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "orders",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Delete Order",
+            "request": {
+                "method": "DELETE",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/orders/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "orders",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Create Order Item",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"menuItemId\": 3, \"quantity\": 1, \"price\": 8}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/orders/1/items",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "orders",
+                        "1",
+                        "items"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Update Order Item",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"menuItemId\": 3, \"quantity\": 2, \"price\": 8}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/orders/1/items/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "orders",
+                        "1",
+                        "items",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Delete Order Item",
+            "request": {
+                "method": "DELETE",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/orders/1/items/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "orders",
+                        "1",
+                        "items",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Get Payments",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/payments?status=completed",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "payments"
+                    ],
+                    "query": [
+                        {
+                            "key": "status",
+                            "value": "completed"
+                        }
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Create Payment",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"orderId\": 1, \"amount\": 20, \"method\": \"card\", \"status\": \"pending\"}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/payments",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "payments"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Update Payment",
+            "request": {
+                "method": "PUT",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"orderId\": 1, \"amount\": 20, \"method\": \"card\", \"status\": \"completed\"}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/payments/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "payments",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Create Rating",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\"menuItemId\": 1, \"rating\": 5, \"comment\": \"Tuyệt vời, rất đáng thử!\"}"
+                },
+                "url": {
+                    "raw": "http://localhost:3001/api/ratings",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "ratings"
+                    ]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Get Ratings by Menu Item ID",
+            "request": {
+                "method": "GET",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "url": {
+                    "raw": "http://localhost:3001/api/ratings/menu-item/1",
+                    "protocol": "http",
+                    "host": [
+                        "localhost"
+                    ],
+                    "port": "3001",
+                    "path": [
+                        "api",
+                        "ratings",
+                        "menu-item",
+                        "1"
+                    ]
+                }
+            },
+            "response": []
+        }
+    ]
+}

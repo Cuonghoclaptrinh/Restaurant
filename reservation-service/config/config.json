@@ -1,0 +1,10 @@
+{
+    "development": {
+        "username": "postgres",
+        "password": "postgres",
+        "database": "restaurantdb",
+        "host": "postgres_db",
+        "dialect": "postgres",
+        "logging": false
+    }
+}

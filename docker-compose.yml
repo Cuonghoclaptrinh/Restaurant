@@ -1,0 +1,93 @@
+services:
+  postgres_db:
+    image: postgres:15
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: restaurantdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d restaurantdb"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app-network
+
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DATABASE_URL=postgres://postgres:postgres@postgres_db:5432/restaurantdb
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  reservation-service:
+    build:
+      context: ./reservation-service
+      dockerfile: Dockerfile
+    container_name: reservation-service
+    restart: always
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - DATABASE_URL=postgres://postgres:postgres@postgres_db:5432/restaurantdb
+      - ORDER_SERVICE_URL=http://order-service:3001
+    depends_on:
+      - postgres_db
+      - order-service
+    networks:
+      - app-network
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - DATABASE_URL=postgres://postgres:postgres@postgres_db:5432/restaurantdb
+      - JWT_SECRET=your-super-secret-jwt-key-123456789
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - app-network
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres_db
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:
+    driver: bridge
