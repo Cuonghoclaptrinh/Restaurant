@@ -1,0 +1,28 @@
+INSERT INTO "Tables" ("tableNumber", "capacity", "zone", "status", "createdAt", "updatedAt") VALUES
+-- Bàn nhỏ (2-4 người) - Khu trong nhà (Indoor)
+(1, 4, 'indoor', 'available', NOW(), NOW()),
+(2, 2, 'indoor', 'available', NOW(), NOW()),
+(3, 4, 'indoor', 'available', NOW(), NOW()),
+(4, 2, 'indoor', 'available', NOW(), NOW()),
+(5, 4, 'indoor', 'available', NOW(), NOW()),
+
+-- Bàn cỡ trung (6 người) - Khu trong nhà (Indoor)
+(6, 6, 'indoor', 'available', NOW(), NOW()),
+(7, 6, 'indoor', 'available', NOW(), NOW()),
+(8, 6, 'available', 'available', NOW(), NOW()), -- Đổi zone mặc định
+(9, 4, 'indoor', 'available', NOW(), NOW()),
+(10, 4, 'indoor', 'available', NOW(), NOW()),
+
+-- Bàn ngoài trời/khu vực đặc biệt (Outdoor/VIP)
+(11, 4, 'outdoor', 'available', NOW(), NOW()),
+(12, 4, 'outdoor', 'available', NOW(), NOW()),
+(13, 8, 'vip', 'available', NOW(), NOW()), -- Bàn lớn/VIP
+(14, 2, 'outdoor', 'available', NOW(), NOW()),
+(15, 6, 'outdoor', 'available', NOW(), NOW()),
+
+-- Bàn lớn (8-10 người)
+(16, 8, 'indoor', 'available', NOW(), NOW()),
+(17, 10, 'indoor', 'available', NOW(), NOW()),
+(18, 4, 'indoor', 'available', NOW(), NOW()),
+(19, 2, 'indoor', 'available', NOW(), NOW()),
+(20, 6, 'outdoor', 'available', NOW(), NOW());

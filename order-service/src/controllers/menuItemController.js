@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const MenuItem = require('../models/menuItem');
 const Rating = require('../models/rating');
+const redisClient = require('../utils/redisClient')
 
 // Để khỏi lặp lại chuỗi
 const CATEGORY_LIST = ['breakfast', 'lunch', 'dinner', 'appetizer'];
@@ -40,13 +41,14 @@ class MenuItemController {
             return res.status(400).json({ errors: errors.array() });
 
         try {
-            const { name, price, category, type, description } = req.body;
+            const { name, price, category, type, description, imageUrl } = req.body;
             const menuItem = await MenuItem.create({
                 name,
                 price,
                 category,
                 type,
                 description,
+                imageUrl,
             });
             return res.status(201).json(menuItem);
         } catch (error) {
@@ -57,50 +59,84 @@ class MenuItemController {
 
     // ----- Get list + filter + pagination -----
     static async getAllMenuItems(req, res) {
+        console.time('getAllMenuItems_total')
+
         try {
             const {
-                query,     // search by name
+                query,
                 category,
                 type,
                 minPrice,
                 maxPrice,
                 page = 1,
                 limit = 20,
-            } = req.query;
+            } = req.query
 
-            const where = {};
+            const pageNum = Math.max(parseInt(page) || 1, 1)
+            const pageSize = Math.max(parseInt(limit) || 20, 1)
+
+            // 🔑 Tạo key cache theo bộ filter + phân trang
+            const cacheKey = `menu_items:${JSON.stringify({
+                query: query || '',
+                category: category || '',
+                type: type || '',
+                minPrice: minPrice || '',
+                maxPrice: maxPrice || '',
+                page: pageNum,
+                limit: pageSize,
+            })}`
+
+            // 1) Thử đọc từ Redis trước
+            console.time('redis_get_menu_items')
+            const cached = await redisClient.get(cacheKey)
+            console.timeEnd('redis_get_menu_items')
+
+            if (cached) {
+                console.log('✅ [CACHE HIT] getAllMenuItems →', cacheKey)
+                const parsed = JSON.parse(cached)
+                console.timeEnd('getAllMenuItems_total')
+                // Trả đúng format cũ + extra flag fromCache cho dễ debug (FE dùng/không dùng đều được)
+                return res.json({
+                    ...parsed,
+                    fromCache: true,
+                })
+            }
+
+            console.log('❌ [CACHE MISS] getAllMenuItems →', cacheKey)
+
+            // 2) Nếu cache miss → build where và query DB như cũ
+            const where = {}
 
             if (query) {
-                // tìm theo tên, không phân biệt hoa thường
-                where.name = { [Op.iLike]: `%${query}%` };
+                where.name = { [Op.iLike]: `%${query}%` }
             }
 
             if (category && CATEGORY_LIST.includes(category)) {
-                where.category = category;
+                where.category = category
             }
 
             if (type && TYPE_LIST.includes(type)) {
-                where.type = type;
+                where.type = type
             }
 
             if (minPrice || maxPrice) {
-                where.price = {};
-                if (minPrice) where.price[Op.gte] = parseFloat(minPrice);
-                if (maxPrice) where.price[Op.lte] = parseFloat(maxPrice);
+                where.price = {}
+                if (minPrice) where.price[Op.gte] = parseFloat(minPrice)
+                if (maxPrice) where.price[Op.lte] = parseFloat(maxPrice)
             }
 
-            const pageNum = Math.max(parseInt(page) || 1, 1);
-            const pageSize = Math.max(parseInt(limit) || 20, 1);
-            const offset = (pageNum - 1) * pageSize;
+            const offset = (pageNum - 1) * pageSize
 
+            console.time('db_find_menu_items')
             const { rows, count } = await MenuItem.findAndCountAll({
                 where,
                 offset,
                 limit: pageSize,
                 order: [['createdAt', 'DESC']],
-            });
+            })
+            console.timeEnd('db_find_menu_items')
 
-            return res.json({
+            const responsePayload = {
                 data: rows,
                 pagination: {
                     total: count,
@@ -108,12 +144,32 @@ class MenuItemController {
                     limit: pageSize,
                     totalPages: Math.ceil(count / pageSize),
                 },
-            });
+            }
+
+            // 3) Ghi kết quả vào Redis (ví dụ sống 60 giây)
+            await redisClient.set(cacheKey, JSON.stringify(responsePayload), {
+                EX: 60, // TTL 60s
+            })
+            console.log(
+                '💾 [CACHE SET] getAllMenuItems',
+                cacheKey,
+                'count =',
+                rows.length
+            )
+
+            console.timeEnd('getAllMenuItems_total')
+
+            return res.json({
+                ...responsePayload,
+                fromCache: false,
+            })
         } catch (error) {
-            console.error('Get all menu items error:', error);
-            return res.status(500).json({ error: error.message });
+            console.timeEnd('getAllMenuItems_total')
+            console.error('Get all menu items error:', error)
+            return res.status(500).json({ error: error.message })
         }
     }
+
 
     // ----- Get detail + ratings -----
     static async getMenuItemById(req, res) {
@@ -175,6 +231,9 @@ class MenuItemController {
             const { name, price, category, type, description } = req.body;
             await menuItem.update({ name, price, category, type, description });
 
+            await redisClient.del(CACHE_KEY)
+            console.log('🧹 [CACHE DEL] after update menu item')
+
             return res.json(menuItem);
         } catch (error) {
             console.error('Update menu item error:', error);
@@ -197,6 +256,10 @@ class MenuItemController {
             }
 
             await menuItem.destroy();
+
+            await redisClient.del(CACHE_KEY)
+            console.log('🧹 [CACHE DEL] after update menu item')
+
             return res.status(204).send();
         } catch (error) {
             console.error('Delete menu item error:', error);

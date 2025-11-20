@@ -31,6 +31,10 @@ module.exports = {
                 type: Sequelize.TEXT,
                 allowNull: true,
             },
+            imageUrl: {
+                type: Sequelize.STRING, 
+                allowNull: true,
+            },
             createdAt: {
                 type: Sequelize.DATE,
                 defaultValue: Sequelize.fn('now'),
@@ -149,7 +153,7 @@ module.exports = {
                 primaryKey: true,
             },
             orderId: {
-                type: Sequelize.INTEGER, 
+                type: Sequelize.INTEGER,
                 allowNull: false,
             },
             menuItemId: {
@@ -175,7 +179,7 @@ module.exports = {
             },
             orderId: {
                 type: Sequelize.INTEGER,
-                allowNull: true, 
+                allowNull: true,
                 unique: true,
             },
             amount: {

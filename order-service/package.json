@@ -5,19 +5,27 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "sync": "node src/config/sync.js"
+    "sync": "node src/config/sync.js",
+    "test": "cross-env NODE_ENV=test TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/restaurant_test jest --runInBand"
   },
   "dependencies": {
+    "amqplib": "^0.10.9",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^3.3.2",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
+    "redis": "^5.10.0",
     "sequelize": "^6.37.7"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
+    "jest": "^30.2.0",
     "nodemon": "^3.1.10",
-    "sequelize-cli": "^6.6.1"
+    "sequelize-cli": "^6.6.1",
+    "supertest": "^7.1.4"
   }
 }

@@ -28,6 +28,10 @@ const MenuItem = sequelize.define('MenuItem', {
         type: DataTypes.TEXT,
         allowNull: true
     },
+    imageUrl: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
     createdAt: {
         type: DataTypes.DATE,
         defaultValue: DataTypes.NOW

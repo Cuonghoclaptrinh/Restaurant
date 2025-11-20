@@ -2,6 +2,8 @@ const { body, validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const Payment = require('../models/payment');
 const Order = require('../models/order');
+const { setTableStatus } = require('../utils/tableClient');
+
 
 class PaymentController {
 
@@ -52,11 +54,15 @@ class PaymentController {
                 orderId,
                 amount,
                 method,
-                status: 'completed' // hoặc pending tùy tích hợp Momo/ZaloPay sau
+                status: 'completed'
             });
 
             // 4. Cập nhật trạng thái order
             await order.update({ status: 'completed' });
+
+            if (order.orderType === 'dine-in' && order.tableId) {
+                await setTableStatus(order.tableId, 'available');
+            }
 
             res.status(201).json(payment);
         } catch (error) {
@@ -100,6 +106,10 @@ class PaymentController {
             const order = await Order.findByPk(payment.orderId);
             if (order && status === 'completed') {
                 await order.update({ status: 'completed' });
+
+                if (order.orderType === 'dine-in' && order.tableId) {
+                    await setTableStatus(order.tableId, 'available');
+                }
             }
 
             res.json(payment);

@@ -2,7 +2,11 @@ const { Reservation, Table } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const fetch = require('node-fetch');
+const { publishReservationCreated } = require('../mq/publisher')
 
+
+const ORDER_SERVICE_URL =
+    process.env.ORDER_SERVICE_URL || 'http://order-service:3001'
 class ReservationController {
 
     // GET /api/reservations
@@ -77,10 +81,10 @@ class ReservationController {
                 status = 'pending',
             } = req.body;
 
-            // 1. Tìm bàn theo tableNumber
+            // 1. Tìm bàn theo tableNumber (đúng kiểu INTEGER)
             const table = await Table.findOne({
                 where: {
-                    tableNumber: String(tableNumber), // trong model là STRING(10)
+                    tableNumber: parseInt(tableNumber, 10),
                 },
             });
 
@@ -98,7 +102,24 @@ class ReservationController {
 
             const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
 
-            // 3. Tạo reservation
+            // 3. Check trùng time slot trên cùng bàn
+            // Overlap nếu: (new.start < old.end) && (new.end > old.start)
+            const conflict = await Reservation.findOne({
+                where: {
+                    tableId: table.id,
+                    status: { [Op.in]: ['pending', 'confirmed'] }, // reservation còn hiệu lực
+                    startTime: { [Op.lt]: endTime },
+                    endTime: { [Op.gt]: startTime },
+                },
+            });
+
+            if (conflict) {
+                return res.status(400).json({
+                    error: 'Table already reserved in this time slot',
+                });
+            }
+
+            // 4. Tạo reservation
             const reservation = await Reservation.create({
                 customerName,
                 customerPhone,
@@ -110,30 +131,60 @@ class ReservationController {
                 notes: notes || null,
             });
 
-            // 4. (Optional) Gọi order-service tạo sẵn order gắn với reservation
+            // (Optional) cập nhật trạng thái bàn là 'reserved'
             try {
-                const orderResponse = await fetch('http://order-service:3001/api/orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        orderType: 'dine-in',
-                        tableId: table.id,          // lưu id bàn (integer/uuid tuỳ schema)
-                        reservationId: reservation.id,
-                        status: 'pending',
-                    }),
-                });
-
-                if (!orderResponse.ok) {
-                    console.error('Tạo order thất bại:', await orderResponse.text());
-                } else {
-                    const order = await orderResponse.json();
-                    console.log('Tạo order thành công, id:', order.id);
-                }
-            } catch (fetchError) {
-                console.error('Lỗi kết nối đến order-service:', fetchError.message);
+                await table.update({ status: 'reserved' });
+            } catch (e) {
+                console.error('Không cập nhật được status bàn:', e.message);
             }
 
-            res.status(201).json(reservation);
+            // 5. (Optional) Gọi order-service tạo sẵn order gắn với reservation
+            // try {
+            //     console.log('Gọi order-service:', `${ORDER_SERVICE_URL}/`)
+
+            //     const orderResponse = await fetch(`${ORDER_SERVICE_URL}/`, {
+            //         method: 'POST',
+            //         headers: {
+            //             'Content-Type': 'application/json',
+            //             // rất quan trọng: forward luôn Authorization header từ FE sang
+            //             Authorization: req.headers.authorization || '',
+            //         },
+            //         body: JSON.stringify({
+            //             orderType: 'dine-in',
+            //             tableId: table.id,
+            //             reservationId: reservation.id,
+            //             status: 'pending',
+            //         }),
+            //     })
+
+            //     const text = await orderResponse.text()
+
+            //     if (!orderResponse.ok) {
+            //         console.error('Tạo order thất bại:', orderResponse.status, text)
+            //     } else {
+            //         const order = JSON.parse(text)
+            //         console.log('Tạo order thành công, id:', order.id)
+            //     }
+            // } catch (fetchError) {
+            //     console.error('Lỗi kết nối đến order-service:', fetchError.message)
+            // }
+            // res.status(201).json(reservation);
+
+            // 5. Đẩy event vào MQ để order-service tạo order async
+            try {
+                await publishReservationCreated({
+                    reservationId: reservation.id,
+                    tableId: table.id,
+                    partySize,
+                    customerName,
+                    customerPhone,
+                    startTime,
+                })
+            } catch (mqErr) {
+                console.error('Không publish được reservation.created:', mqErr.message)
+            }
+
+
         } catch (error) {
             console.error('create reservation error:', error);
             res.status(500).json({ error: error.message });
@@ -148,32 +199,36 @@ class ReservationController {
                 return res.status(400).json({ error: 'date, time, partySize required' });
             }
 
-            const start = new Date(`${date}T${time}`);
-            const end = new Date(start);
-            end.setHours(end.getHours() + 2);
+            const start = new Date(`${date}T${time}:00`);
+            const end = new Date(start.getTime() + 2 * 60 * 60 * 1000); // mặc định 2h
 
-            // Tìm bàn trống
+            // 1. Lấy tất cả bàn đủ sức chứa (capacity >= partySize)
             const tables = await Table.findAll({
                 where: {
-                    capacity: { [Op.gte]: parseInt(partySize) },
-                    status: 'available'
+                    capacity: { [Op.gte]: parseInt(partySize, 10) },
+                    status: 'available', // nếu bạn muốn chỉ bàn available
                 },
-                include: [
-                    {
-                        association: 'reservations',
-                        required: false,
-                        where: {
-                            [Op.or]: [
-                                { startTime: { [Op.gte]: end } },
-                                { endTime: { [Op.lte]: start } }
-                            ]
-                        }
-                    }
-                ]
             });
 
-            res.json(tables);
+            const availableTables = [];
 
+            // 2. Với mỗi bàn, check xem có reservation nào overlap không
+            for (const table of tables) {
+                const conflict = await Reservation.findOne({
+                    where: {
+                        tableId: table.id,
+                        status: { [Op.in]: ['pending', 'confirmed'] },
+                        startTime: { [Op.lt]: end },
+                        endTime: { [Op.gt]: start },
+                    },
+                });
+
+                if (!conflict) {
+                    availableTables.push(table);
+                }
+            }
+
+            res.json(availableTables);
         } catch (error) {
             console.error('available-tables error:', error);
             res.status(500).json({ error: error.message });
