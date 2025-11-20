@@ -3,11 +3,16 @@ const { body, validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const MenuItem = require('../models/menuItem');
 const Rating = require('../models/rating');
-const redisClient = require('../utils/redisClient')
 
 // Để khỏi lặp lại chuỗi
-const CATEGORY_LIST = ['breakfast', 'lunch', 'dinner', 'appetizer'];
+const CATEGORY_LIST = ['breakfast', 'lunch', 'dinner', 'starters', 'appetizer'];
 const TYPE_LIST = ['food', 'drink', 'dessert'];
+const SORTABLE_FIELDS = ['price', 'createdAt', 'orderIndex'];
+
+const sanitizePayload = (payload = {}) =>
+    Object.fromEntries(
+        Object.entries(payload).filter(([, value]) => value !== undefined),
+    );
 
 class MenuItemController {
     // ----- Validate -----
@@ -31,6 +36,37 @@ class MenuItemController {
                 .optional()
                 .isString()
                 .withMessage('Description must be a string'),
+            body('imageUrl')
+                .optional()
+                .isString()
+                .withMessage('imageUrl must be a string'),
+            body('badge')
+                .optional()
+                .isString()
+                .withMessage('badge must be a string'),
+            body('ctaLabel')
+                .optional()
+                .isString()
+                .withMessage('ctaLabel must be a string'),
+            body('orderIndex')
+                .optional()
+                .isInt()
+                .withMessage('orderIndex must be an integer'),
+            body('isFeatured')
+                .optional()
+                .isBoolean()
+                .withMessage('isFeatured must be boolean'),
+            body('sku')
+                .optional()
+                .isString()
+                .withMessage('sku must be a string'),
+            body('tags')
+                .optional()
+                .isArray()
+                .withMessage('tags must be an array of strings')
+                .bail()
+                .custom((tags) => tags.every((tag) => typeof tag === 'string'))
+                .withMessage('each tag must be a string'),
         ];
     }
 
@@ -41,15 +77,34 @@ class MenuItemController {
             return res.status(400).json({ errors: errors.array() });
 
         try {
-            const { name, price, category, type, description, imageUrl } = req.body;
-            const menuItem = await MenuItem.create({
+            const {
                 name,
                 price,
                 category,
                 type,
                 description,
                 imageUrl,
-            });
+                badge,
+                ctaLabel,
+                orderIndex,
+                isFeatured,
+                sku,
+                tags,
+            } = req.body;
+            const menuItem = await MenuItem.create(sanitizePayload({
+                name,
+                price,
+                category,
+                type,
+                description,
+                imageUrl,
+                badge,
+                ctaLabel,
+                orderIndex,
+                isFeatured,
+                sku,
+                tags,
+            }));
             return res.status(201).json(menuItem);
         } catch (error) {
             console.error('Create menu item error:', error);
@@ -59,84 +114,76 @@ class MenuItemController {
 
     // ----- Get list + filter + pagination -----
     static async getAllMenuItems(req, res) {
-        console.time('getAllMenuItems_total')
-
         try {
             const {
-                query,
+                query,     // search by name
                 category,
                 type,
                 minPrice,
                 maxPrice,
                 page = 1,
                 limit = 20,
-            } = req.query
+                sortBy,
+                sortDirection,
+                isFeatured,
+                excludeId,
+            } = req.query;
 
-            const pageNum = Math.max(parseInt(page) || 1, 1)
-            const pageSize = Math.max(parseInt(limit) || 20, 1)
-
-            // 🔑 Tạo key cache theo bộ filter + phân trang
-            const cacheKey = `menu_items:${JSON.stringify({
-                query: query || '',
-                category: category || '',
-                type: type || '',
-                minPrice: minPrice || '',
-                maxPrice: maxPrice || '',
-                page: pageNum,
-                limit: pageSize,
-            })}`
-
-            // 1) Thử đọc từ Redis trước
-            console.time('redis_get_menu_items')
-            const cached = await redisClient.get(cacheKey)
-            console.timeEnd('redis_get_menu_items')
-
-            if (cached) {
-                console.log('✅ [CACHE HIT] getAllMenuItems →', cacheKey)
-                const parsed = JSON.parse(cached)
-                console.timeEnd('getAllMenuItems_total')
-                // Trả đúng format cũ + extra flag fromCache cho dễ debug (FE dùng/không dùng đều được)
-                return res.json({
-                    ...parsed,
-                    fromCache: true,
-                })
-            }
-
-            console.log('❌ [CACHE MISS] getAllMenuItems →', cacheKey)
-
-            // 2) Nếu cache miss → build where và query DB như cũ
-            const where = {}
+            const where = {};
 
             if (query) {
-                where.name = { [Op.iLike]: `%${query}%` }
+                // tìm theo tên, không phân biệt hoa thường
+                where.name = { [Op.iLike]: `%${query}%` };
             }
 
             if (category && CATEGORY_LIST.includes(category)) {
-                where.category = category
+                where.category = category;
             }
 
             if (type && TYPE_LIST.includes(type)) {
-                where.type = type
+                where.type = type;
+            }
+
+            if (typeof isFeatured !== 'undefined') {
+                if (['true', 'false'].includes(String(isFeatured))) {
+                    where.isFeatured = String(isFeatured) === 'true';
+                }
             }
 
             if (minPrice || maxPrice) {
-                where.price = {}
-                if (minPrice) where.price[Op.gte] = parseFloat(minPrice)
-                if (maxPrice) where.price[Op.lte] = parseFloat(maxPrice)
+                where.price = {};
+                if (minPrice) where.price[Op.gte] = parseFloat(minPrice);
+                if (maxPrice) where.price[Op.lte] = parseFloat(maxPrice);
             }
 
-            const offset = (pageNum - 1) * pageSize
+            if (excludeId) {
+                const excludeNum = Number(excludeId);
+                if (Number.isInteger(excludeNum)) {
+                    where.id = {
+                        ...(where.id || {}),
+                        [Op.ne]: excludeNum,
+                    };
+                }
+            }
 
-            console.time('db_find_menu_items')
+            const pageNum = Math.max(parseInt(page) || 1, 1);
+            const pageSize = Math.max(parseInt(limit) || 20, 1);
+            const offset = (pageNum - 1) * pageSize;
+
+            const normalizedSortField = SORTABLE_FIELDS.includes(sortBy) ? sortBy : 'orderIndex';
+            const normalizedDirection = String(sortDirection).toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
+
             const { rows, count } = await MenuItem.findAndCountAll({
                 where,
                 offset,
                 limit: pageSize,
-                order: [['createdAt', 'DESC']],
-            })
-            console.timeEnd('db_find_menu_items')
+                order: [
+                    [normalizedSortField, normalizedDirection],
+                    ['createdAt', 'DESC'],
+                ],
+            });
 
-            const responsePayload = {
+            return res.json({
                 data: rows,
                 pagination: {
                     total: count,
@@ -144,32 +191,12 @@ class MenuItemController {
                     limit: pageSize,
                     totalPages: Math.ceil(count / pageSize),
                 },
-            }
-
-            // 3) Ghi kết quả vào Redis (ví dụ sống 60 giây)
-            await redisClient.set(cacheKey, JSON.stringify(responsePayload), {
-                EX: 60, // TTL 60s
-            })
-            console.log(
-                '💾 [CACHE SET] getAllMenuItems',
-                cacheKey,
-                'count =',
-                rows.length
-            )
-
-            console.timeEnd('getAllMenuItems_total')
-
-            return res.json({
-                ...responsePayload,
-                fromCache: false,
-            })
+            });
         } catch (error) {
-            console.timeEnd('getAllMenuItems_total')
-            console.error('Get all menu items error:', error)
-            return res.status(500).json({ error: error.message })
+            console.error('Get all menu items error:', error);
+            return res.status(500).json({ error: error.message });
         }
     }
-
 
     // ----- Get detail + ratings -----
     static async getMenuItemById(req, res) {
@@ -228,11 +255,34 @@ class MenuItemController {
                 return res.status(404).json({ error: 'Menu item not found' });
             }
 
-            const { name, price, category, type, description } = req.body;
-            await menuItem.update({ name, price, category, type, description });
-
-            await redisClient.del(CACHE_KEY)
-            console.log('🧹 [CACHE DEL] after update menu item')
+            const {
+                name,
+                price,
+                category,
+                type,
+                description,
+                imageUrl,
+                badge,
+                ctaLabel,
+                orderIndex,
+                isFeatured,
+                sku,
+                tags,
+            } = req.body;
+            await menuItem.update(sanitizePayload({
+                name,
+                price,
+                category,
+                type,
+                description,
+                imageUrl,
+                badge,
+                ctaLabel,
+                orderIndex,
+                isFeatured,
+                sku,
+                tags,
+            }));
 
             return res.json(menuItem);
         } catch (error) {
@@ -256,10 +306,6 @@ class MenuItemController {
             }
 
             await menuItem.destroy();
-
-            await redisClient.del(CACHE_KEY)
-            console.log('🧹 [CACHE DEL] after update menu item')
-
             return res.status(204).send();
         } catch (error) {
             console.error('Delete menu item error:', error);

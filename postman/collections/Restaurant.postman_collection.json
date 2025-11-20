@@ -22,14 +22,13 @@
               }
             },
             "url": {
-              "raw": "http://localhost:3001/api/menu-items",
+              "raw": "http://localhost:3001/menu-items",
               "protocol": "http",
               "host": [
                 "localhost"
               ],
               "port": "3001",
               "path": [
-                "api",
                 "menu-items"
               ]
             }

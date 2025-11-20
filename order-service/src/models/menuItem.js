@@ -28,9 +28,37 @@ const MenuItem = sequelize.define('MenuItem', {
         type: DataTypes.TEXT,
         allowNull: true
     },
+    sku: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    tags: {
+        type: DataTypes.ARRAY(DataTypes.STRING),
+        allowNull: false,
+        defaultValue: [],
+    },
     imageUrl: {
         type: DataTypes.STRING,
         allowNull: true,
+    },
+    badge: {
+        type: DataTypes.STRING,
+        allowNull: true,
+    },
+    ctaLabel: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        defaultValue: 'Đặt món ngay',
+    },
+    orderIndex: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0,
+    },
+    isFeatured: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
     },
     createdAt: {
         type: DataTypes.DATE,
