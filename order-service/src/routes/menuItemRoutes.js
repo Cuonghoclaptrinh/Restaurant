@@ -2,11 +2,12 @@ const express = require('express');
 const router = express.Router();
 const MenuItemController = require('../controllers/menuItemController');
 
-router.get('/menu-items', MenuItemController.getAllMenuItems);     
-router.get('/menu-items/:id', MenuItemController.getMenuItemById);
+// Routes đã được mount với prefix '/menu-items' trong app.js, nên không cần prefix ở đây
+router.get('/', MenuItemController.getAllMenuItems);     
+router.get('/:id', MenuItemController.getMenuItemById);
 
-router.post('/menu-items', MenuItemController.validateMenuItem(), MenuItemController.createMenuItem);
-router.put('/menu-items/:id', MenuItemController.validateMenuItem(), MenuItemController.updateMenuItem);
-router.delete('/menu-items/:id', MenuItemController.deleteMenuItem);
+router.post('/', MenuItemController.validateMenuItem(), MenuItemController.createMenuItem);
+router.put('/:id', MenuItemController.validateMenuItem(), MenuItemController.updateMenuItem);
+router.delete('/:id', MenuItemController.deleteMenuItem);
 
 module.exports = router;

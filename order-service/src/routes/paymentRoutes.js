@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const PaymentController = require('../controllers/paymentController');
 
-router.get('/payments', PaymentController.getAllPayments);
-router.post('/payments', PaymentController.validateCreatePayment(), PaymentController.createPayment);
-router.put('/payments/:id', PaymentController.validateUpdatePayment(), PaymentController.updatePayment);
+// Routes đã được mount với prefix '/payments' trong app.js, nên không cần prefix ở đây
+router.get('/', PaymentController.getAllPayments);
+router.post('/', PaymentController.validateCreatePayment(), PaymentController.createPayment);
+router.put('/:id', PaymentController.validateUpdatePayment(), PaymentController.updatePayment);
 
 module.exports = router;

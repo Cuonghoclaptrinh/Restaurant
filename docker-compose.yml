@@ -51,6 +51,8 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@postgres_db:5432/restaurantdb
       - JWT_SECRET=${JWT_SECRET}
       - RESERVATION_SERVICE_URL=http://reservation-service:3002
+      - OTEL_SERVICE_NAME=order-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -70,6 +72,8 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@postgres_db:5432/restaurantdb
       - ORDER_SERVICE_URL=http://order-service:3001
       - JWT_SECRET=${JWT_SECRET}
+      - OTEL_SERVICE_NAME=reservation-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     depends_on:
       - postgres_db
       - order-service
@@ -88,6 +92,8 @@ services:
       - DATABASE_URL=postgres://postgres:postgres@postgres_db:5432/restaurantdb
       - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRE=${JWT_EXPIRE}
+      - OTEL_SERVICE_NAME=auth-service
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318/v1/traces
     depends_on:
       postgres_db:
         condition: service_healthy
@@ -128,6 +134,32 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     networks:
       - app-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml
+    ports:
+      - "4318:4318"   # OTLP HTTP
+      - "4317:4317"   # OTLP gRPC
+    depends_on:
+      - jaeger
+    networks:
+      - app-network   # dùng cùng network với order-service
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "14250:14250"   # gRPC
+    networks:
+      - app-network
+
 volumes:
   postgres_data:
 

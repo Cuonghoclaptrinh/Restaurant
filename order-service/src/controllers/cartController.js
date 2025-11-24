@@ -1,4 +1,15 @@
-const { Cart, CartItem, MenuItem, Order, OrderItem } = require('../models');
+const models = require('../models');
+const { Cart, CartItem, MenuItem, Order, OrderItem } = models;
+
+// Kiểm tra models đã được load chưa
+if (!Cart || !CartItem || !MenuItem) {
+  console.error('Models not loaded properly:', {
+    Cart: !!Cart,
+    CartItem: !!CartItem,
+    MenuItem: !!MenuItem
+  });
+  throw new Error('Models not initialized. Cart, CartItem, or MenuItem is undefined.');
+}
 
 const FALLBACK_IMAGE = 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80';
 
@@ -64,11 +75,21 @@ module.exports = {
 
   async getCartByUser(req, res) {
     try {
+      // Kiểm tra lại models trước khi sử dụng
+      if (!Cart || typeof Cart.findOne !== 'function') {
+        console.error('Cart model is not properly loaded');
+        return res.status(500).json({
+          error: 'Failed to get cart',
+          message: 'Cart model not initialized'
+        });
+      }
+
       const userId = req.user.id;
       const cart = await findOrCreateCart(userId);
       res.json(formatCart(cart));
     } catch (error) {
       console.error('getCartByUser error:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({
         error: 'Failed to get cart',
         message: error.message,

@@ -23,6 +23,10 @@ function authMiddleware(requiredRoles = []) {
             };
 
             if (requiredRoles.length > 0 && !requiredRoles.includes(decoded.role)) {
+                console.log('❌ ROLE CHECK FAILED', {
+                    decodedRole: decoded.role,
+                    requiredRoles,
+                });
                 return res.status(403).json({ message: 'Forbidden: insufficient role' });
             }
 

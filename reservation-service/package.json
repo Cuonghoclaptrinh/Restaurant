@@ -8,6 +8,11 @@
     "test": "cross-env NODE_ENV=test TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/restaurant_test jest --runInBand"
   },
   "dependencies": {
+    "@opentelemetry/auto-instrumentations-node": "^0.67.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.208.0",
+    "@opentelemetry/resources": "^2.2.0",
+    "@opentelemetry/sdk-node": "^0.208.0",
+    "@opentelemetry/semantic-conventions": "^1.38.0",
     "amqplib": "^0.10.9",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",

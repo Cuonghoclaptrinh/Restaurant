@@ -48,12 +48,16 @@ app.use(
 );
 
 // 🌐 Proxy tới order-service
+// Giữ nguyên path /orders vì Express tự động xử lý prefix khi mount router
+// Flow: Frontend -> /orders -> API Gateway -> /orders -> Order-service
+// Order-service: app.use('/orders', orderRoutes) sẽ match và gửi path còn lại tới router
+// Router: router.get('/') sẽ match với path còn lại (sau khi bỏ /orders)
 app.use(
     '/orders',
     createProxyMiddleware({
         target: ORDER_SERVICE_URL,
         changeOrigin: true,
-        pathRewrite: { '^/orders': '' },
+        // Không rewrite - giữ nguyên path để Express tự xử lý
         logLevel: 'debug',
         onProxyReq: (proxyReq, req, res) => {
             console.log('→ ORDER PROXY:', req.method, req.originalUrl, '=>', proxyReq.path);

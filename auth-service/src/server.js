@@ -1,4 +1,6 @@
-// src/server.js (hoặc index.js tùy bạn đặt)
+
+require('./tracing');
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');

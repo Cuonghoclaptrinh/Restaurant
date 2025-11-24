@@ -13,8 +13,7 @@ async function setTableStatus(tableId, status) {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                // Nếu bạn muốn có token nội bộ thì gắn vào đây
-                // 'Authorization': `Bearer ${process.env.INTERNAL_ADMIN_TOKEN}`
+                
             },
             body: JSON.stringify({ status }),
         })

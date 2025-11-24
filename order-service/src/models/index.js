@@ -6,6 +6,8 @@ const Order = require('./order');
 const OrderItem = require('./orderItem');
 const Payment = require('./payment');
 const Rating = require('./rating');
+const Cart = require('./cart');
+const CartItem = require('./cartItem');
 
 // ========== Associations ==========
 
@@ -51,6 +53,27 @@ Rating.belongsTo(MenuItem, {
     as: 'menuItem',
 });
 
+// Cart 1 - N CartItem
+Cart.hasMany(CartItem, {
+    foreignKey: 'cartId',
+    as: 'items',
+    onDelete: 'CASCADE',
+});
+CartItem.belongsTo(Cart, {
+    foreignKey: 'cartId',
+    as: 'cart',
+});
+
+// MenuItem 1 - N CartItem
+MenuItem.hasMany(CartItem, {
+    foreignKey: 'menuItemId',
+    as: 'cartItems',
+});
+CartItem.belongsTo(MenuItem, {
+    foreignKey: 'menuItemId',
+    as: 'menuItem',
+});
+
 // Xuất ra cho chỗ khác dùng
 module.exports = {
     sequelize,
@@ -59,4 +82,6 @@ module.exports = {
     OrderItem,
     Payment,
     Rating,
+    Cart,
+    CartItem,
 };

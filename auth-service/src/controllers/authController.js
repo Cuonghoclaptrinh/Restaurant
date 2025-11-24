@@ -2,6 +2,7 @@ const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const UserProfile = require('../models/userProfile');
+const { ensureCartForUser } = require('../utils/cartClient');
 
 const generateToken = (payload) => {
     return jwt.sign(payload, process.env.JWT_SECRET || 'fallback_secret', {
@@ -32,6 +33,18 @@ exports.register = async (req, res) => {
             city: null,
             country: 'Vietnam',
         });
+
+        const userId = user.id;
+
+        try {
+            await ensureCartForUser(userId);
+        } catch (err) {
+            // Không nên làm fail luôn đăng ký nếu cart bị lỗi
+            console.error(
+                '⚠️ Signup ok nhưng create cart failed for userId',
+                userId
+            );
+        }
 
         const token = generateToken({ id: user.id, role: user.role });
 
