@@ -31,10 +31,13 @@ services:
       AUTH_SERVICE_URL: http://auth-service:3003
       ORDER_SERVICE_URL: http://order-service:3001
       RESERVATION_SERVICE_URL: http://reservation-service:3002
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     depends_on:
       - auth-service
       - order-service
       - reservation-service
+      - redis 
     networks:
       - app-network
 

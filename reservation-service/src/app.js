@@ -1,5 +1,6 @@
 // src/app.js
 const express = require('express');
+const cors = require('cors');
 const dotenv = require('dotenv');
 const reservationRoutes = require('./routes/reservationRoutes');
 const tableRoutes = require('./routes/tableRoutes')
@@ -7,6 +8,7 @@ const tableRoutes = require('./routes/tableRoutes')
 dotenv.config();
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 // Routes
