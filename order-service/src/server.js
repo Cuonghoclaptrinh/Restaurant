@@ -1,3 +1,4 @@
+require('./tracing');
 const dotenv = require('dotenv');
 const app = require('./app');
 const { startReservationConsumer } = require('./mq/consumer');
@@ -18,7 +19,7 @@ const { sequelize } = require('./models');
         // Tạo/alter bảng nếu cần
         // await sequelize.sync({ alter: true });
         // console.log('Order-Service: Database synced');
-        
+
         startReservationConsumer();
 
         app.listen(PORT, '0.0.0.0', () => {

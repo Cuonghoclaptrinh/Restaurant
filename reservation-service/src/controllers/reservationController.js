@@ -1,3 +1,6 @@
+const { trace, context } = require('@opentelemetry/api');
+const tracer = trace.getTracer('reservation-service');
+
 const { Reservation, Table } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
@@ -63,12 +66,20 @@ class ReservationController {
 
     // POST /api/reservations
     static async create(req, res) {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
+        const span = tracer.startSpan('reservation.create', {
+            attributes: {
+                'app.feature': 'reservation',
+            }
+        });
 
         try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                span.setStatus({ code: 1, message: 'validation error' });
+                span.setAttribute('validation.error_count', errors.array().length);
+                return res.status(400).json({ errors: errors.array() });
+            }
+
             const {
                 customerName,
                 customerPhone,
@@ -81,45 +92,63 @@ class ReservationController {
                 status = 'pending',
             } = req.body;
 
-            // 1. Tìm bàn theo tableNumber (đúng kiểu INTEGER)
+            span.setAttribute('reservation.customer_name', customerName || 'unknown');
+            span.setAttribute('reservation.table_number', tableNumber);
+            span.setAttribute('reservation.party_size', partySize);
+
+            const spanCtx = trace.setSpan(context.active(), span);
+
+            // 🔹 Sub-span 1: find table
+            const findTableSpan = tracer.startSpan('reservation.findTable', undefined, spanCtx);
             const table = await Table.findOne({
                 where: {
                     tableNumber: parseInt(tableNumber, 10),
                 },
             });
+            findTableSpan.setAttribute('table.found', !!table);
+            findTableSpan.end();
 
             if (!table) {
+                span.setStatus({ code: 1, message: 'Table not found' });
                 return res.status(404).json({ error: 'Table not found' });
             }
 
-            // 2. Ghép thành startTime / endTime
+            // 🔹 Sub-span 2: build time window
+            const timeSpan = tracer.startSpan('reservation.buildTimeWindow', undefined, spanCtx);
             const startTime = new Date(`${reservationDate}T${reservationTime}:00`);
             if (isNaN(startTime.getTime())) {
+                timeSpan.setStatus({ code: 1, message: 'Invalid startTime' });
+                timeSpan.end();
+                span.setStatus({ code: 1, message: 'Invalid startTime' });
                 return res
                     .status(400)
                     .json({ error: 'Không tạo được startTime từ reservationDate + reservationTime' });
             }
-
             const endTime = new Date(startTime.getTime() + durationMinutes * 60 * 1000);
+            timeSpan.end();
 
-            // 3. Check trùng time slot trên cùng bàn
-            // Overlap nếu: (new.start < old.end) && (new.end > old.start)
+            // 🔹 Sub-span 3: check conflict
+            const conflictSpan = tracer.startSpan('reservation.checkConflict', undefined, spanCtx);
             const conflict = await Reservation.findOne({
                 where: {
                     tableId: table.id,
-                    status: { [Op.in]: ['pending', 'confirmed'] }, // reservation còn hiệu lực
+                    status: { [Op.in]: ['pending', 'confirmed'] },
                     startTime: { [Op.lt]: endTime },
                     endTime: { [Op.gt]: startTime },
                 },
             });
+            conflictSpan.setAttribute('reservation.conflict', !!conflict);
+            conflictSpan.end();
 
             if (conflict) {
+                span.setStatus({ code: 1, message: 'Time slot conflict' });
                 return res.status(400).json({
                     error: 'Table already reserved in this time slot',
                 });
             }
 
-            // 4. Tạo reservation
+            // 🔹 Sub-span 4: create reservation DB record
+            const dbSpan = tracer.startSpan('reservation.db.create', undefined, spanCtx);
             const reservation = await Reservation.create({
                 customerName,
                 customerPhone,
@@ -130,47 +159,24 @@ class ReservationController {
                 status,
                 notes: notes || null,
             });
+            dbSpan.setAttribute('reservation.id', reservation.id);
+            dbSpan.end();
 
-            // (Optional) cập nhật trạng thái bàn là 'reserved'
+            // 🔹 Sub-span 5: update table status
+            const tableSpan = tracer.startSpan('reservation.updateTableStatus', undefined, spanCtx);
             try {
                 await table.update({ status: 'reserved' });
+                tableSpan.setStatus({ code: 0 });
             } catch (e) {
+                tableSpan.recordException(e);
+                tableSpan.setStatus({ code: 1, message: e.message });
                 console.error('Không cập nhật được status bàn:', e.message);
+            } finally {
+                tableSpan.end();
             }
 
-            // 5. (Optional) Gọi order-service tạo sẵn order gắn với reservation
-            // try {
-            //     console.log('Gọi order-service:', `${ORDER_SERVICE_URL}/`)
-
-            //     const orderResponse = await fetch(`${ORDER_SERVICE_URL}/`, {
-            //         method: 'POST',
-            //         headers: {
-            //             'Content-Type': 'application/json',
-            //             // rất quan trọng: forward luôn Authorization header từ FE sang
-            //             Authorization: req.headers.authorization || '',
-            //         },
-            //         body: JSON.stringify({
-            //             orderType: 'dine-in',
-            //             tableId: table.id,
-            //             reservationId: reservation.id,
-            //             status: 'pending',
-            //         }),
-            //     })
-
-            //     const text = await orderResponse.text()
-
-            //     if (!orderResponse.ok) {
-            //         console.error('Tạo order thất bại:', orderResponse.status, text)
-            //     } else {
-            //         const order = JSON.parse(text)
-            //         console.log('Tạo order thành công, id:', order.id)
-            //     }
-            // } catch (fetchError) {
-            //     console.error('Lỗi kết nối đến order-service:', fetchError.message)
-            // }
-            // res.status(201).json(reservation);
-
-            // 5. Đẩy event vào MQ để order-service tạo order async
+            // 🔹 Sub-span 6: publish MQ event để order-service tạo Order async
+            const mqSpan = tracer.startSpan('reservation.publish_mq', undefined, spanCtx);
             try {
                 await publishReservationCreated({
                     reservationId: reservation.id,
@@ -179,17 +185,30 @@ class ReservationController {
                     customerName,
                     customerPhone,
                     startTime,
-                })
+                });
+                mqSpan.setStatus({ code: 0 });
             } catch (mqErr) {
-                console.error('Không publish được reservation.created:', mqErr.message)
+                mqSpan.recordException(mqErr);
+                mqSpan.setStatus({ code: 1, message: mqErr.message });
+                console.error('Không publish được reservation.created:', mqErr.message);
+                // tuỳ bạn: có coi đây là lỗi fatal hay vẫn tạo reservation bình thường
+            } finally {
+                mqSpan.end();
             }
 
-
+            span.setStatus({ code: 0 }); // OK
+            // ⚠️ BUG trước đây: bạn không res.json → request bị treo
+            res.status(201).json(reservation);
         } catch (error) {
             console.error('create reservation error:', error);
+            span.recordException(error);
+            span.setStatus({ code: 1, message: error.message });
             res.status(500).json({ error: error.message });
+        } finally {
+            span.end();
         }
     }
+
     // GET /api/reservations/available-tables
     static async getAvailableTables(req, res) {
         try {

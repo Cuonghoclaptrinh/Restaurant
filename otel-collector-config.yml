@@ -1,12 +1,15 @@
 receivers:
   otlp:
     protocols:
-      http:
       grpc:
+        endpoint: "0.0.0.0:4317"
+      http:
+        endpoint: "0.0.0.0:4318"
 
 exporters:
-  jaeger:
-    endpoint: "jaeger:14250"
+  # Collector sẽ gửi trace sang Jaeger bằng OTLP gRPC
+  otlp:
+    endpoint: "jaeger:4317"
     tls:
       insecure: true
 
@@ -14,4 +17,4 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [jaeger]
+      exporters: [otlp]

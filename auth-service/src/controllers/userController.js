@@ -1,5 +1,5 @@
 // src/controllers/userController.js
-const { User } = require('../models')
+const User = require('../models/user')
 const { validationResult } = require('express-validator')
 const bcrypt = require('bcryptjs')
 

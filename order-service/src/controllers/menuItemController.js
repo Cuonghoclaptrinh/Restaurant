@@ -6,7 +6,14 @@ const MenuItem = require('../models/menuItem');
 const Rating = require('../models/rating');
 
 // Để khỏi lặp lại chuỗi
-const CATEGORY_LIST = ['breakfast', 'lunch', 'dinner', 'starters', 'appetizer'];
+const CATEGORY_LIST = ['breakfast',
+    'lunch',
+    'dinner',
+    'snack',
+    'dessert',
+    'drink',
+    'starters',
+    'appetizer',];
 const TYPE_LIST = ['food', 'drink', 'dessert'];
 const SORTABLE_FIELDS = ['price', 'createdAt', 'orderIndex'];
 
@@ -14,6 +21,21 @@ const sanitizePayload = (payload = {}) =>
     Object.fromEntries(
         Object.entries(payload).filter(([, value]) => value !== undefined),
     );
+
+const clearMenuItemsCache = async () => {
+    try {
+        const keys = await redisClient.keys('menu_items:*')
+        if (!keys || keys.length === 0) {
+            return
+        }
+
+        // node-redis v4: del(...keys)
+        await redisClient.del(...keys)
+        console.log('🧹 [CACHE DEL] cleared menu_items keys:', keys.length)
+    } catch (err) {
+        console.error('clearMenuItemsCache error:', err)
+    }
+}
 
 class MenuItemController {
     // ----- Validate -----
@@ -38,7 +60,7 @@ class MenuItemController {
                 .isString()
                 .withMessage('Description must be a string'),
             body('imageUrl')
-                .optional()
+                .optional({ nullable: true })
                 .isString()
                 .withMessage('imageUrl must be a string'),
             body('badge')
@@ -106,6 +128,7 @@ class MenuItemController {
                 sku,
                 tags,
             }));
+            await clearMenuItemsCache();
             return res.status(201).json(menuItem);
         } catch (error) {
             console.error('Create menu item error:', error);
@@ -225,7 +248,7 @@ class MenuItemController {
             return res.status(500).json({ error: error.message })
         }
     }
-    
+
 
 
     // static async getAllMenuItems(req, res) {
@@ -399,8 +422,7 @@ class MenuItemController {
                 tags,
             }));
 
-            await redisClient.del(CACHE_KEY)
-            console.log('🧹 [CACHE DEL] after delete menu item')
+            await clearMenuItemsCache()
 
             return res.json(menuItem);
         } catch (error) {
@@ -425,8 +447,7 @@ class MenuItemController {
 
             await menuItem.destroy();
 
-            await redisClient.del(CACHE_KEY)
-            console.log('🧹 [CACHE DEL] after delete menu item')
+            await clearMenuItemsCache()
 
             return res.status(204).send();
         } catch (error) {

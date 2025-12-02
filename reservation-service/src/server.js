@@ -30,11 +30,10 @@
 // })();
 
 
-// src/server.js
+
+require('./tracing');
 const app = require('./app');
-const { sequelize } = require('./models'); // nếu bạn có models/index.js
-// HOẶC nếu chưa có models/index.js thì có thể bỏ dòng này đi
-// và require config trực tiếp: const sequelize = require('./config/database');
+const { sequelize } = require('./models'); 
 
 const PORT = process.env.PORT || 3001;
 

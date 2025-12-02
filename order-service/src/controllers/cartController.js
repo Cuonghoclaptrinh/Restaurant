@@ -1,3 +1,6 @@
+const { trace, context } = require('@opentelemetry/api');
+const tracer = trace.getTracer('order-service');
+
 const models = require('../models');
 const { Cart, CartItem, MenuItem, Order, OrderItem } = models;
 
@@ -216,19 +219,45 @@ module.exports = {
   },
 
   async checkoutFromCart(req, res) {
+    // Span mẹ cho toàn bộ flow checkout
+    const span = tracer.startSpan('checkoutFromCart', {
+      attributes: {
+        'app.feature': 'checkout',
+        'span.kind': 'internal'
+      }
+    });
+
     try {
       const userId = req.user.id;
       const { customerName, customerPhone, deliveryAddress, deliveryNote, orderType } = req.body;
+
+      span.setAttribute('user.id', userId);
+      span.setAttribute('order.requested_type', orderType || 'not_provided');
+
+      // Tạo context để các span con là child của checkoutFromCart
+      const spanCtx = trace.setSpan(context.active(), span);
+
+      // 🔹 Sub-span 1: load cart
+      const loadCartSpan = tracer.startSpan('checkout.loadCart', undefined, spanCtx);
 
       const cart = await Cart.findOne({
         where: { userId, status: 'active' },
         include: cartInclude
       });
 
+      loadCartSpan.setAttribute('cart.found', !!cart);
+      loadCartSpan.end();
+
       if (!cart || !cart.items || cart.items.length === 0) {
+        span.setAttribute('cart.empty', true);
+        span.setStatus({ code: 1, message: 'Cart empty' });
         return res.status(400).json({ error: 'Cart empty' });
       }
 
+      span.setAttribute('cart.items_count', cart.items.length);
+
+      // 🔹 Sub-span 2: create order record
+      const createOrderSpan = tracer.startSpan('checkout.createOrder', undefined, spanCtx);
       const order = await Order.create({
         orderType: orderType || cart.orderType || 'delivery',
         customerName: customerName || cart.customerName,
@@ -237,7 +266,10 @@ module.exports = {
         deliveryNote: deliveryNote || cart.deliveryNote,
         status: 'pending'
       });
+      createOrderSpan.setAttribute('order.id', order.id);
+      createOrderSpan.end();
 
+      const itemsSpan = tracer.startSpan('checkout.createOrderItems', undefined, spanCtx);
       for (const it of cart.items) {
         await OrderItem.create({
           orderId: order.id,
@@ -246,15 +278,25 @@ module.exports = {
           price: it.price
         });
       }
+      itemsSpan.setAttribute('order.items_count', cart.items.length);
+      itemsSpan.end();
 
+      const clearCartSpan = tracer.startSpan('checkout.clearCart', undefined, spanCtx);
       await CartItem.destroy({ where: { cartId: cart.id } });
       cart.status = 'converted';
       await cart.save();
+      clearCartSpan.end();
+
+      span.setStatus({ code: 0 });
 
       res.json({ message: 'Order created', orderId: order.id });
     } catch (error) {
       console.error('checkoutFromCart error:', error);
+      span.recordException(error);
+      span.setStatus({ code: 1, message: error.message });
       res.status(500).json({ error: 'Failed to checkout cart', message: error.message });
+    } finally {
+      span.end();
     }
   }
 };

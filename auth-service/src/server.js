@@ -6,6 +6,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const authRoutes = require('./routes/auth');
 const profileRoutes = require('./routes/profile');
+const userRoutes = require('./routes/userRoutes');
 
 const seedAdmin = require('./seedAdmin')
 
@@ -23,6 +24,7 @@ app.get('/health', (req, res) => {
 // Routes
 app.use(authRoutes);
 app.use(profileRoutes);
+app.use(userRoutes);
 
 const PORT = process.env.PORT || 3003;
 
